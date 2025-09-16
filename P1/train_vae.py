@@ -7,7 +7,7 @@ from torchvision import datasets, transforms
 from torchvision.utils import save_image
 
 # --- Configuration ---
-DATA_DIR = "kolam_dataset"  # Directory containing the 'images' subfolder
+DATA_DIR = "kolam_images"  # Directory containing the 'images' subfolder
 OUTPUT_DIR = "vae_output"
 MODEL_PATH = os.path.join(OUTPUT_DIR, "vae_kolam.pth")
 IMG_SIZE = 64
