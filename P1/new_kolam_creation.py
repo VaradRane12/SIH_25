@@ -1,78 +1,116 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import os
+import random # Import the random module
 
-def create_kolam_v2(n=7, img_size=600, sigma=20.0, file_name="kolam_corrected.png"):
-    """
-    Generates and saves a symmetrical Kolam pattern with corrected dot grid logic.
-
-    Args:
-        n (int): The number of dots in the central row (must be an odd number).
-        img_size (int): The pixel dimension of the output square image.
-        sigma (float): The width of the Gaussian blobs, controlling line spacing.
-        file_name (str): The name of the output image file.
-    """
+def generate_kolam_field(n, img_size, sign_pattern="checker"):
+    """Creates the base scalar field from a rhombic dot grid."""
     if n % 2 == 0:
         n += 1
-        print(f"Input 'n' must be odd. Using n={n} instead.")
 
-    # 1. Create a clear and robust rhombic dot grid with alternating signs.
     dot_positions = []
     dot_signs = []
     
-    # The grid is centered at (0,0). Iterate from top row to bottom row.
-    # 'i' represents the row index from the center.
     for i in range(-(n // 2), (n // 2) + 1):
         num_dots_in_row = n - 2 * abs(i)
-        y = i * 2.0 / n  # Y-coordinate for this row
+        y = i * 2.0 / n
         
-        # 'j' represents the column index within the row.
         for j in range(num_dots_in_row):
-            # Calculate the X-coordinate to center the row.
             x = (j * 2.0 - (num_dots_in_row - 1)) / n
             dot_positions.append((x, y))
             
-            # Assign sign based on grid position for a checkerboard pattern
-            sign = 1 if (i + j) % 2 == 0 else -1
+            if sign_pattern == "checker":
+                sign = 1 if (i + j) % 2 == 0 else -1
+            elif sign_pattern == "rows":
+                sign = 1 if i % 2 == 0 else -1
+            else: 
+                sign = 1 if (i + j) % 2 == 0 else -1
             dot_signs.append(sign)
 
-    # 2. Create the coordinate grid for the image canvas.
-    linspace = np.linspace(-1.0, 1.0, img_size)
+    linspace = np.linspace(-1.2, 1.2, img_size)
     X, Y = np.meshgrid(linspace, linspace)
     
-    # 3. Calculate the scalar field value at each point.
     Z = np.zeros_like(X)
+    sigma = (img_size / n) * 1.5
+    
     for (dot_x, dot_y), sign in zip(dot_positions, dot_signs):
         distance_sq = (X - dot_x)**2 + (Y - dot_y)**2
-        # The influence of each dot is a Gaussian function multiplied by its sign.
-        Z += sign * np.exp(-distance_sq * (sigma**2))
+        Z += sign * np.exp(-distance_sq * (sigma**2) / (img_size / 100)**2)
+        
+    return X, Y, Z, dot_positions
 
-    # 4. Plot the results.
+def add_layers(Z, num_layers=5, scale_factor=0.5):
+    """Adds complexity by layering flipped and scaled versions of the field."""
+    if num_layers < 2:
+        return Z
+        
+    base_field = Z.copy()
+    layered_field = Z.copy()
+    for i in range(1, num_layers):
+        flipped_field = base_field[::-1, ::-1]
+        layered_field += (scale_factor ** i) * flipped_field
+    return layered_field
+
+def draw_kolam(n, img_size, sign_pattern, num_layers, levels, file_name):
+    """
+    The core drawing function that takes specific design parameters.
+    """
+    X, Y, Z, dot_positions = generate_kolam_field(n, img_size, sign_pattern)
+    Z = add_layers(Z, num_layers=num_layers)
+    
     fig, ax = plt.subplots(figsize=(8, 8), facecolor='white')
     
-    # Draw the contour line at level 0, which forms the Kolam pattern.
-    ax.contour(X, Y, Z, levels=[0], colors='black', linewidths=2)
+    ax.contour(X, Y, Z, levels=levels, colors='black', linewidths=2)
     
-    # Draw the dots on top.
-    dots_x, dots_y = zip(*dot_positions)
-    ax.scatter(dots_x, dots_y, color='black', s=60, zorder=5)
+    if dot_positions:
+        dots_x, dots_y = zip(*dot_positions)
+        ax.scatter(dots_x, dots_y, color='black', s=50, zorder=5)
 
-    # Clean up and save the plot.
     ax.set_aspect('equal', 'box')
     ax.axis('off')
     plt.tight_layout(pad=0)
-    
     plt.savefig(file_name, dpi=150, bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
-    print(f"✅ Corrected Kolam saved as {file_name}")
+    print(f"🎨 Random Kolam with n={n} saved as {file_name}")
+    print(f"    Parameters used: pattern='{sign_pattern}', layers={num_layers}, levels={levels}")
+
+
+def draw_random_kolam(n, img_size=800, file_name="kolam_random.png"):
+    """
+    Generates a Kolam with randomized design parameters.
+    """
+    # 1. Randomly choose the sign pattern
+    random_sign_pattern = random.choice(["checker", "rows"])
+
+    # 2. Randomly choose the number of layers (more chance for simpler designs)
+    random_num_layers = random.choices([1, 2, 3], weights=[0.5, 0.35, 0.15], k=1)[0]
+    
+    # 3. Randomly choose the number of contour lines and their spacing
+    num_lines = random.choices([1, 3, 5], weights=[0.5, 0.4, 0.1], k=1)[0]
+    if num_lines == 1:
+        random_levels = [0]
+    else:
+        spacing = random.uniform(0.08, 0.15)
+        if num_lines == 3:
+            random_levels = [-spacing, 0, spacing]
+        else: # 5 lines
+            random_levels = [-2 * spacing, -spacing, 0, spacing, 2 * spacing]
+
+    # Call the main drawing function with the random parameters
+    draw_kolam(n=n,
+               img_size=img_size,
+               sign_pattern=random_sign_pattern,
+               num_layers=random_num_layers,
+               levels=random_levels,
+               file_name=file_name)
 
 
 if __name__ == '__main__':
-    # --- Create a Kolam with a 7-dot center row ---
-    # create_kolam_v2(n=7, sigma=25.0, file_name="kolam_7_dot_corrected.png")
+    # --- Generate a random Kolam with a 9-dot center row ---
+    draw_random_kolam(n=9, file_name="random_kolam_9_dots.png")
 
-    # # --- Create a Kolam with an 11-dot center row ---
-    # create_kolam_v2(n=11, sigma=35.0, file_name="kolam_11_dot_corrected.png")
+    # --- Generate another random one with a 13-dot center row ---
+    # Running this multiple times will produce different results
+    draw_random_kolam(n=13, file_name="random_kolam_13_dots.png")
     
-    # --- Create a more complex 15-dot Kolam ---
-    create_kolam_v2(n=25, sigma=550.0, file_name="kolam_15_dot_corrected.png")
+    # --- Generate a third one to see the variety ---
+    draw_random_kolam(n=25, file_name="random_kolam_15_dots.png")
