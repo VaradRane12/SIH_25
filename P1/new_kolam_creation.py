@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import List, Tuple
 import math
 from io import BytesIO
+import imageio
 
 # Import the KolamGenerator classes from the previous file
 # For Streamlit, we'll include them here directly
@@ -196,6 +197,54 @@ class KolamGenerator:
         
         plt.tight_layout()
         return fig, ax
+    
+    def animate_kolam(self, style='kambi', complexity='medium',
+                      show_dots=True, line_width=2, line_color='black', dot_color='red',
+                      frames=30, interval=0.1):
+        """Create an animated GIF of the Kolam being drawn progressively"""
+        if style == 'kambi':
+            dots, curves = self.generate_kambi_kolam()
+        else:
+            dots, curves = self.generate_pulli_kolam(complexity)
+        
+        images = []
+        for step in range(1, frames + 1):
+            fig, ax = plt.subplots(figsize=(6, 6), facecolor='white')
+            
+            # Draw partial curves based on animation progress
+            for curve in curves:
+                if len(curve) > 0:
+                    n_points = int(len(curve) * step / frames)
+                    if n_points > 1:
+                        ax.plot(curve[:n_points, 0], curve[:n_points, 1], 
+                               color=line_color, linewidth=line_width)
+            
+            # Always show dots if enabled
+            if show_dots and len(dots) > 0:
+                ax.scatter(dots[:, 0], dots[:, 1], color=dot_color, s=30, zorder=5)
+            
+            ax.set_aspect('equal')
+            ax.axis('off')
+            
+            if len(dots) > 0:
+                margin = 1
+                ax.set_xlim(dots[:, 0].min() - margin, dots[:, 0].max() + margin)
+                ax.set_ylim(dots[:, 1].min() - margin, dots[:, 1].max() + margin)
+            
+            plt.tight_layout()
+            
+            # Save frame to buffer
+            buf = BytesIO()
+            fig.savefig(buf, format="png", dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            images.append(imageio.v2.imread(buf))
+            plt.close(fig)
+        
+        # Create GIF
+        gif_buf = BytesIO()
+        imageio.mimsave(gif_buf, images, format='GIF', duration=interval)
+        gif_buf.seek(0)
+        return gif_buf
 
 # Streamlit App
 st.set_page_config(page_title="Kolam Pattern Generator", 
@@ -213,7 +262,7 @@ showing how mathematical patterns create these beautiful traditional art forms.
 st.sidebar.header("Kolam Configuration")
 
 # Tab layout for different modes
-tab1, tab2, tab3 = st.tabs(["Custom Design", "Random Generation", "Design Principles"])
+tab1, tab2, tab3, tab4 = st.tabs(["Custom Design", "Animation Studio", "Random Generation", "Design Principles"])
 
 with tab1:
     col1, col2 = st.columns([1, 2])
@@ -284,6 +333,83 @@ with tab1:
                 plt.close(fig)
 
 with tab2:
+    st.subheader("🎬 Animation Studio")
+    st.markdown("Create animated GIFs showing the progressive drawing of Kolam patterns.")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.markdown("#### Animation Parameters")
+        
+        # Animation parameters
+        anim_n_dots = st.slider("Number of dots", 
+                               min_value=3, max_value=15, value=7, step=2,
+                               key="anim_dots")
+        
+        anim_style = st.selectbox("Animation Style", 
+                                 options=['kambi', 'pulli'],
+                                 format_func=lambda x: 'Kambi (Loop)' if x == 'kambi' else 'Pulli (Dotted)',
+                                 key="anim_style")
+        
+        if anim_style == 'pulli':
+            anim_complexity = st.selectbox("Animation Complexity",
+                                          options=['simple', 'medium', 'complex'],
+                                          key="anim_complexity")
+        else:
+            anim_complexity = 'medium'
+        
+        st.markdown("#### Animation Settings")
+        frames = st.slider("Number of frames", 20, 60, 30, 5,
+                          help="More frames = smoother animation")
+        speed = st.slider("Animation speed", 0.05, 0.5, 0.1, 0.05,
+                         help="Lower values = faster animation")
+        
+        anim_show_dots = st.checkbox("Show dots in animation", value=True, key="anim_dots_check")
+        anim_line_width = st.slider("Animation line width", 1.0, 4.0, 2.0, 0.5, key="anim_line_width")
+        
+        # Color selection for animation
+        col_a, col_b = st.columns(2)
+        with col_a:
+            anim_line_color = st.color_picker("Animation line color", "#000000", key="anim_line_color")
+        with col_b:
+            anim_dot_color = st.color_picker("Animation dot color", "#FF0000", key="anim_dot_color")
+        
+        create_animation_btn = st.button("Create Animation", type="primary", use_container_width=True)
+    
+    with col2:
+        if create_animation_btn:
+            with st.spinner(f"Creating animation with {frames} frames... This may take a moment."):
+                try:
+                    generator = KolamGenerator(anim_n_dots)
+                    gif_buffer = generator.animate_kolam(
+                        style=anim_style,
+                        complexity=anim_complexity,
+                        show_dots=anim_show_dots,
+                        line_width=anim_line_width,
+                        line_color=anim_line_color,
+                        dot_color=anim_dot_color,
+                        frames=frames,
+                        interval=speed
+                    )
+                    
+                    # Display the animation
+                    st.image(gif_buffer.getvalue(), use_container_width=True)
+                    
+                    # Download button for GIF
+                    st.download_button(
+                        label="Download Animation (GIF)",
+                        data=gif_buffer.getvalue(),
+                        file_name=f"kolam_animation_{anim_style}_{anim_n_dots}dots.gif",
+                        mime="image/gif"
+                    )
+                    
+                    st.success("Animation created successfully!")
+                    
+                except Exception as e:
+                    st.error(f"Error creating animation: {str(e)}")
+                    st.info("Try reducing the number of frames or complexity if you encounter issues.")
+
+with tab3:
     st.subheader("Random Kolam Generator")
     st.markdown("Generate random Kolam patterns to explore the variety of designs possible.")
     
@@ -338,7 +464,7 @@ with tab2:
             st.pyplot(fig)
             plt.close(fig)
 
-with tab3:
+with tab4:
     st.subheader("📚 Mathematical Design Principles")
     
     col1, col2 = st.columns(2)
@@ -394,6 +520,7 @@ with tab3:
     2. **Curve Weaving**: Implements Bezier curves to create smooth paths between dots
     3. **Pattern Symmetry**: Applies transformation matrices to ensure rotational and reflective symmetry
     4. **Complexity Levels**: Uses different mathematical patterns (circles, figure-8s, stars) based on complexity
+    5. **Animation**: Progressive curve drawing using frame-by-frame rendering
     
     This demonstrates how traditional art forms encode sophisticated mathematical principles that can be 
     computationally modeled and recreated.
