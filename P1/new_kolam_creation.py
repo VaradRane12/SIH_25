@@ -333,7 +333,7 @@ with tab1:
                 plt.close(fig)
 
 with tab2:
-    st.subheader("🎬 Animation Studio")
+    st.subheader("Animation Studio")
     st.markdown("Create animated GIFs showing the progressive drawing of Kolam patterns.")
     
     col1, col2 = st.columns([1, 2])
@@ -465,7 +465,7 @@ with tab3:
             plt.close(fig)
 
 with tab4:
-    st.subheader("📚 Mathematical Design Principles")
+    st.subheader("Mathematical Design Principles")
     
     col1, col2 = st.columns(2)
     
